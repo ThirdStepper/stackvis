@@ -6,6 +6,9 @@ use eframe::egui::epaint::Hsva;
 use crate::engine::{AlgorithmStateSnapshot, EngineConfig, EngineController, EngineSharedState, EngineState};
 use crate::ui::settings_panel::{SettingsPanelAction, SettingsPanelState};
 
+// Maximum number of columns in the algorithm grid
+const MAX_GRID_COLUMNS: usize = 4;
+
 pub struct SortVisApp {
     shared_state: Arc<Mutex<EngineSharedState>>,
     engine_controller: EngineController,
@@ -100,17 +103,26 @@ impl SortVisApp {
             .floor()
             .max(1.0) as usize;
 
-        // Determine column count considering both dimensions
-        let column_count = if rows_from_height >= 2 && algorithm_count > 1 {
-            // Vertical space allows 2+ rows, so enforce minimum 2 rows
-            // max_columns = ceil(algorithm_count / 2)
+        // Apply maximum column cap
+        let columns_capped = columns_from_width.min(MAX_GRID_COLUMNS);
+
+        // Determine column count considering both dimensions and row preference
+        let column_count = if rows_from_height >= 3 && algorithm_count >= 3 {
+            // Vertical space allows 3+ rows, enforce minimum 3 rows
+            // max_columns = ceil(algorithm_count / 3)
+            let max_columns_for_three_rows = (algorithm_count + 2) / 3;
+            columns_capped
+                .min(max_columns_for_three_rows)
+                .min(algorithm_count)
+        } else if rows_from_height >= 2 && algorithm_count > 1 {
+            // Vertical space allows 2+ rows, enforce minimum 2 rows
             let max_columns_for_two_rows = (algorithm_count + 1) / 2;
-            columns_from_width
+            columns_capped
                 .min(max_columns_for_two_rows)
                 .min(algorithm_count)
         } else {
             // Not enough vertical space, or only 1 algorithm
-            columns_from_width.min(algorithm_count)
+            columns_capped.min(algorithm_count)
         };
 
         let row_count = ((algorithm_count + column_count - 1) / column_count).max(1);
