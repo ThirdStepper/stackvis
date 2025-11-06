@@ -7,6 +7,8 @@ use crate::sorting_algorithms::SortingAlgorithmKind;
 pub struct SettingsPanelState {
     pub number_of_values: usize,
     pub frames_per_second: u32,
+    
+    // which algos to use
     pub use_bubble_sort: bool,
     pub use_quick_sort: bool,
     use_insertion_sort: bool,
@@ -19,6 +21,13 @@ pub struct SettingsPanelState {
     use_cocktail_sort: bool,
     use_comb_sort: bool,
     use_gnome_sort: bool,
+    
+    // color palette settings
+    pub use_custom_palette: bool,
+    pub palette_base_hue_degrees: f32,
+    pub palette_saturation: f32,
+    pub palette_brightness: f32,
+    pub palette_gradient_strength: f32,
 }
 
 pub enum SettingsPanelAction {
@@ -32,6 +41,8 @@ impl Default for SettingsPanelState {
         Self {
             number_of_values: 128,
             frames_per_second: 30,
+
+            // sorting algo defaults
             use_bubble_sort: true,
             use_quick_sort: true,
             use_insertion_sort: false,
@@ -44,6 +55,13 @@ impl Default for SettingsPanelState {
             use_cocktail_sort: false,
             use_comb_sort: false,
             use_gnome_sort: false,
+
+            // color palette defaults
+            use_custom_palette: false,
+            palette_base_hue_degrees: 210.0,   // ~teal
+            palette_saturation: 0.85,
+            palette_brightness: 0.9,
+            palette_gradient_strength: 0.18,
         }
     }
 }
@@ -158,7 +176,37 @@ impl SettingsPanelState {
 
         ui.separator();
 
+        // --------------------------------------------------------------------
+        // Color palette settings
+        // --------------------------------------------------------------------
+        ui.collapsing("Color palette", |ui| {
+            ui.checkbox(&mut self.use_custom_palette, "Use custom bar colors")
+                .on_hover_text("When disabled, bar colors are derived from the current egui theme.");
 
+            ui.add_enabled_ui(self.use_custom_palette, |ui| {
+                ui.add(
+                    egui::Slider::new(&mut self.palette_base_hue_degrees, 0.0..=360.0)
+                        .text("Base hue (degrees)"),
+                );
+
+                ui.add(
+                    egui::Slider::new(&mut self.palette_saturation, 0.2..=1.0)
+                        .text("Saturation"),
+                );
+
+                ui.add(
+                    egui::Slider::new(&mut self.palette_brightness, 0.3..=1.0)
+                        .text("Brightness"),
+                );
+
+                ui.add(
+                    egui::Slider::new(&mut self.palette_gradient_strength, 0.0..=0.4)
+                        .text("Gradient strength"),
+                );
+            });
+        });
+
+        ui.separator();
 
         let mut action = SettingsPanelAction::None;
 

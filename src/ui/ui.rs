@@ -208,18 +208,55 @@ impl SortVisApp {
     ) -> Color32 {
         let clamped_value = normalized_value.clamp(0.0, 1.0);
 
-        // Choose base hue: teal for dark mode, orange for light mode
-        let base_hue = if visuals.dark_mode { 0.58 } else { 0.13 };
+        // Snapshot palette settings (short borrows, no borrow conflicts)
+        let use_custom_palette = self.settings_state.use_custom_palette;
+        let palette_base_hue_degrees = self.settings_state.palette_base_hue_degrees;
+        let palette_saturation = self.settings_state.palette_saturation;
+        let palette_brightness = self.settings_state.palette_brightness;
+        let palette_gradient_strength = self.settings_state.palette_gradient_strength;
 
-        // Add hue variation based on the value (±0.09)
-        let hue_variation = 0.18 * (clamped_value - 0.5);
+        // Base hue: either theme-based, or user-defined
+        let base_hue = if use_custom_palette {
+            (palette_base_hue_degrees / 360.0).rem_euclid(1.0)
+        } else if visuals.dark_mode {
+            0.58 // teal-ish
+        } else {
+            0.13 // orange-ish
+        };
+
+        // Gradient strength: how much hue varies with value
+        let gradient_strength = if use_custom_palette {
+            palette_gradient_strength
+        } else {
+            0.18
+        };
+
+        let hue_variation = gradient_strength * (clamped_value - 0.5);
         let hue = (base_hue + hue_variation).rem_euclid(1.0);
 
-        // Adjust saturation for finished algorithms
-        let saturation = if is_finished { 0.5 } else { 0.85 };
+        // Saturation: either fixed theme-based, or user slider with a slight
+        // desaturation for finished algorithms
+        let saturation = if use_custom_palette {
+            let base = palette_saturation.clamp(0.0, 1.0);
+            if is_finished {
+                base * 0.7
+            } else {
+                base
+            }
+        } else if is_finished {
+            0.5
+        } else {
+            0.85
+        };
 
-        // Set brightness based on theme
-        let value_brightness = if visuals.dark_mode { 0.9 } else { 0.7 };
+        // Brightness: either theme-based, or user slider
+        let value_brightness = if use_custom_palette {
+            palette_brightness.clamp(0.0, 1.0)
+        } else if visuals.dark_mode {
+            0.9
+        } else {
+            0.7
+        };
 
         Hsva::new(hue, saturation, value_brightness, 1.0).into()
     }
