@@ -39,11 +39,11 @@ impl Default for SettingsPanelState {
             use_merge_sort: false,
             use_heap_sort: false,
             use_shell_sort: false,
-            use_intro_sort: true,
-            use_tim_sort: true,
-            use_cocktail_sort: true,
-            use_comb_sort: true,
-            use_gnome_sort: true,
+            use_intro_sort: false,
+            use_tim_sort: false,
+            use_cocktail_sort: false,
+            use_comb_sort: false,
+            use_gnome_sort: false,
         }
     }
 }
@@ -64,12 +64,33 @@ impl SettingsPanelState {
 
         ui.separator();
         ui.label("Algorithms to visualize:");
-            
+
+        // --------------------------------------------------------------------
+        // Group 1: Basic O(n²) comparison sorts
+        // --------------------------------------------------------------------
         ui.collapsing("Basic O(n²) comparison sorts", |ui| {
-            ui.label(egui::RichText::new(
-                "Simple, educational sorts – good for seeing the fundamentals."
-            ).small().italics());
-        
+            ui.horizontal(|ui| {
+                ui.label(
+                    egui::RichText::new(
+                        "Simple, educational sorts – good for seeing the fundamentals.",
+                    )
+                    .small()
+                    .italics(),
+                );
+
+                if ui.button("Select all").clicked() {
+                    self.use_bubble_sort = true;
+                    self.use_insertion_sort = true;
+                    self.use_selection_sort = true;
+                    self.use_shell_sort = true;
+                    self.use_cocktail_sort = true;
+                    self.use_comb_sort = true;
+                    self.use_gnome_sort = true;
+                }
+            });
+
+            ui.separator();
+
             ui.horizontal_wrapped(|ui| {
                 ui.checkbox(&mut self.use_bubble_sort, "Bubble Sort");
                 ui.checkbox(&mut self.use_insertion_sort, "Insertion Sort");
@@ -80,12 +101,30 @@ impl SettingsPanelState {
                 ui.checkbox(&mut self.use_gnome_sort, "Gnome Sort");
             });
         });
-        
+
+        // --------------------------------------------------------------------
+        // Group 2: Classic O(n log n) sorts
+        // --------------------------------------------------------------------
         ui.collapsing("Classic O(n log n) sorts", |ui| {
-            ui.label(egui::RichText::new(
-                "Divide-and-conquer algorithms used in textbooks and interviews."
-            ).small().italics());
-        
+            ui.horizontal(|ui| {
+                ui.label(
+                    egui::RichText::new(
+                        "Divide-and-conquer algorithms used in textbooks and interviews.",
+                    )
+                    .small()
+                    .italics(),
+                );
+
+                if ui.button("Select all").clicked() {
+                    self.use_quick_sort = true;
+                    self.use_merge_sort = true;
+                    self.use_heap_sort = true;
+                    self.use_intro_sort = true;
+                }
+            });
+
+            ui.separator();
+
             ui.horizontal_wrapped(|ui| {
                 ui.checkbox(&mut self.use_quick_sort, "Quick Sort");
                 ui.checkbox(&mut self.use_merge_sort, "Merge Sort");
@@ -93,17 +132,30 @@ impl SettingsPanelState {
                 ui.checkbox(&mut self.use_intro_sort, "Intro Sort");
             });
         });
-        
+
+        // --------------------------------------------------------------------
+        // Group 3: Hybrid / practical sorts
+        // --------------------------------------------------------------------
         ui.collapsing("Hybrid / practical sorts", |ui| {
-            ui.label(egui::RichText::new(
-                "More realistic, production-style algorithms."
-            ).small().italics());
-        
+            ui.horizontal(|ui| {
+                ui.label(
+                    egui::RichText::new("More realistic, production-style algorithms.")
+                        .small()
+                        .italics(),
+                );
+
+                if ui.button("Select all").clicked() {
+                    self.use_tim_sort = true;
+                }
+            });
+
+            ui.separator();
+
             ui.horizontal_wrapped(|ui| {
                 ui.checkbox(&mut self.use_tim_sort, "Tim Sort");
             });
         });
-        
+
         ui.separator();
 
 
