@@ -65,7 +65,6 @@ impl SortingAlgorithmKind {
 }
 
 pub struct SortingAlgorithmReplay {
-    algorithm_kind: SortingAlgorithmKind,
     algorithm_name: String,
     frames: Vec<Vec<u32>>,
     stats: SortStats,
@@ -126,7 +125,6 @@ impl SortingAlgorithmReplay {
         let stats = SortStats::from_measurements(total_steps, duration);
 
         SortingAlgorithmReplay {
-            algorithm_kind,
             algorithm_name: algorithm_kind.
                 display_name()
                 .to_owned(),

@@ -1,7 +1,11 @@
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
+use rand::random;
 
 use eframe::egui::{self, Color32};
 use eframe::egui::epaint::Hsva;
+use rodio::{OutputStream, OutputStreamBuilder, Sink, Source, source::SineWave, source::Spatial};
 
 use crate::engine::{AlgorithmStateSnapshot, EngineConfig, EngineController, EngineSharedState, EngineState};
 use crate::ui::settings_panel::{SettingsPanelAction, SettingsPanelState};
@@ -9,10 +13,24 @@ use crate::ui::settings_panel::{SettingsPanelAction, SettingsPanelState};
 // Maximum number of columns in the algorithm grid
 const MAX_GRID_COLUMNS: usize = 4;
 
+// C Major scale
+const C_MAJOR_DEGREES: [i32; 7] = [0, 2, 4, 5, 7, 9, 11];
+
+// spatial audio constants
+const LEFT_EAR_POS: [f32; 3] = [-1.0, 0.0, 0.0];
+const RIGHT_EAR_POS: [f32; 3] = [1.0, 0.0, 0.0];
+// pushes the sound emitter to the front of the listener
+const EMITTER_Z: f32 = 1.0;
+
 pub struct SortVisApp {
     shared_state: Arc<Mutex<EngineSharedState>>,
     engine_controller: EngineController,
     settings_state: SettingsPanelState,
+
+    // Audio - OutputStream must be kept alive for audio to work
+    _audio_stream: Option<OutputStream>,
+    audio_sink: Option<Sink>,
+    previous_values_for_audio: HashMap<String, Vec<u32>>,
 }
 
 impl SortVisApp {
@@ -22,10 +40,23 @@ impl SortVisApp {
     ) -> Self {
         let engine_controller = EngineController::new(Arc::clone(&shared_state));
 
+        // Initialize audio (gracefully handle failure)
+        let (_audio_stream, audio_sink) = match OutputStreamBuilder::open_default_stream() {
+            Ok(stream) => {
+                let sink = Sink::connect_new(&stream.mixer());
+                sink.set_volume(0.2);
+                (Some(stream), Some(sink))
+            }
+            Err(_) => (None, None),
+        };
+
         Self {
             shared_state,
             engine_controller,
             settings_state: SettingsPanelState::default(),
+            _audio_stream,
+            audio_sink,
+            previous_values_for_audio: HashMap::new(),
         }
     }
 
@@ -34,11 +65,20 @@ impl SortVisApp {
             SettingsPanelAction::None => {}
             SettingsPanelAction::StopRequested => {
                 self.engine_controller.stop();
+                // Also stop any queued sounds and reset audio tracking
+                self.clear_audio_state();
             }
             SettingsPanelAction::StartRequested(selected_algorithms) => {
                 if selected_algorithms.is_empty() {
                     return;
                 }
+
+                // randomize base hue (0..360)
+                self.settings_state.palette_base_hue_degrees = random::<f32>() * 360.0;
+
+                // Reset audio & recreate a fresh sink for the new run
+                self.clear_audio_state();
+                self.ensure_audio_sink();
 
                 let engine_config = EngineConfig {
                     number_of_values: self.settings_state.number_of_values,
@@ -48,6 +88,150 @@ impl SortVisApp {
 
                 self.engine_controller.start_run(engine_config);
             }
+        }
+    }
+
+    // Audio state management
+    fn clear_audio_state(&mut self) {
+        // Stop and drop the current sink (this immediately stops queued sounds)
+        if let Some(sink) = self.audio_sink.take() {
+            sink.stop();
+        }
+
+        // Forget last-frame values so we don't detect bogus "changes" later
+        self.previous_values_for_audio.clear();
+    }
+
+    fn ensure_audio_sink(&mut self) {
+        // If we already have a sink (and a stream), nothing to do
+        if self.audio_sink.is_some() {
+            return;
+        }
+
+        // Lazily (re)create a sink if the stream exists
+        if let Some(ref stream) = self._audio_stream {
+            let sink = Sink::connect_new(&stream.mixer());
+            sink.set_volume(0.2);
+            self.audio_sink = Some(sink);
+        }
+    }
+
+    // Audio detection helpers
+    fn detect_first_changed_index(&self, previous: &[u32], current: &[u32]) -> Option<usize> {
+        let min_len = previous.len().min(current.len());
+
+        // Check for changes in common range
+        for i in 0..min_len {
+            if previous[i] != current[i] {
+                return Some(i);
+            }
+        }
+
+        // If lengths differ, that's a change at the first differing index
+        if previous.len() != current.len() {
+            return Some(min_len);
+        }
+
+        None
+    }
+
+    fn play_audio_for_change(&self, current_values: &[u32], changed_index: usize) {
+        let Some(sink) = &self.audio_sink else {
+            return;
+        };
+
+        // prevent tone stacking
+        if !sink.empty() {
+            return;
+        }
+
+        let len = current_values.len();
+        if len == 0 || changed_index >= len {
+            return;
+        }
+
+        let value = current_values[changed_index];
+        let maximum_value = current_values.iter().copied().max().unwrap_or(1) as f32;
+        if maximum_value <= 0.0 {
+            return;
+        }
+
+        // horizontal position (0.0 on the left, 1.0 on the right)
+        let normalized_index = if len > 1 {
+            changed_index as f32 / (len - 1) as f32
+        } else {
+            0.5
+        };
+
+        // bar height (0.0..1.0) for loudness shaping
+        let normalized_value = (value as f32) / maximum_value;
+
+        // c major scale mapping
+        let frequency = c_major_scale_frequency(normalized_index);
+
+        // map horizontal bar position to 3d emitter position for panning
+        let emitter_pos = emitter_position_from_normalized_index(normalized_index);
+
+        // envelope / loudness
+        let amplitude = 0.05 + 0.15 * normalized_value; // 0.05–0.20
+        let duration = Duration::from_millis(40);
+        let attack = Duration::from_millis(5);
+        let release = Duration::from_millis(40);
+
+        // build mono first
+        let base_source = SineWave::new(frequency)
+            .take_duration(duration)
+            .fade_in(attack)
+            .fade_out(release)
+            .amplify(amplitude);
+
+        // wrap in a stereo source
+        let spatial_source = Spatial::new(
+            base_source,
+            emitter_pos,
+            LEFT_EAR_POS,
+            RIGHT_EAR_POS
+        );
+
+        sink.append(spatial_source);
+    }
+
+    fn handle_audio_for_frame(&mut self, engine_state_snapshot: &EngineSharedState) {
+        // if the user disabled audio, flush any queued sounds and bail out.
+        if !self.settings_state.enable_audio {
+            self.clear_audio_state();
+            return;
+        }
+
+        // check if sink exists
+        self.ensure_audio_sink();
+        if self.audio_sink.is_none() {
+            // Audio backend failed to init; nothing we can do.
+            return;
+        }
+
+        let mut tone_played_this_frame = false;
+
+        // process each algorithm
+        for algorithm_state in &engine_state_snapshot.algorithm_states {
+            let algorithm_name = &algorithm_state.algorithm_name;
+            let current_values = &algorithm_state.current_values;
+
+            if let Some(previous_values) = self.previous_values_for_audio.get(algorithm_name) {
+                if !tone_played_this_frame {
+                    if let Some(changed_index) =
+                        self.detect_first_changed_index(previous_values, current_values)
+                    {
+                        self.play_audio_for_change(current_values, changed_index);
+                        tone_played_this_frame = true;
+                    }
+                }
+            }
+
+            self.previous_values_for_audio.insert(
+                algorithm_name.clone(),
+                current_values.clone(),
+            );
         }
     }
 
@@ -383,7 +567,50 @@ impl eframe::App for SortVisApp {
             self.draw_algorithm_grid(ui, &engine_state_snapshot);
         });
 
+        // Handle audio for current frame
+        if let Some(sink) = &self.audio_sink {
+            sink.set_volume(self.settings_state.audio_volume);
+        }
+        self.handle_audio_for_frame(&engine_state_snapshot);
+
         // Continuous animation
         context.request_repaint();
     }
+}
+
+fn emitter_position_from_normalized_index(normalized_index: f32) -> [f32; 3] {
+    let x = (normalized_index.clamp(0.0, 1.0) * 2.0) - 1.0; // 0..1 -> -1..1
+    [x, 0.0, EMITTER_Z]
+}
+
+fn freq_from_semitones(base_freq: f32, semitone_offset: i32) -> f32 {
+    base_freq * 2.0f32.powf(semitone_offset as f32 / 12.0)
+}
+
+fn c_major_scale_frequency(normalized_index: f32) -> f32 {
+    // clamp at start
+    let x = normalized_index.clamp(0.0, 1.0);
+
+    // how many total notes to span
+    // 3 octaves of C-major = 3 * 7 = 21 steps
+    let total_steps = 21;
+
+    // map x -> 0..(total_steps - 1)
+    let step_index = (x * (total_steps - 1) as f32).round() as i32;
+
+    // split into octave index and degree index
+    let degrees_per_octave = C_MAJOR_DEGREES.len() as i32;
+    let octave = step_index / degrees_per_octave;
+    let degree_index = (step_index % degrees_per_octave).max(0);
+
+    // look up the semitone offset within the scale
+    let degree_semitones = C_MAJOR_DEGREES[degree_index as usize];
+
+    // total semitones = octave * 12 + degree offset
+    let total_semitones = octave * 12 + degree_semitones;
+
+    // base note: C3 ≈ 130.81 Hz
+    let base_freq = 440.0;
+
+    freq_from_semitones(base_freq, total_semitones)
 }

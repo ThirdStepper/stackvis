@@ -28,6 +28,10 @@ pub struct SettingsPanelState {
     pub palette_saturation: f32,
     pub palette_brightness: f32,
     pub palette_gradient_strength: f32,
+
+    // audio settings
+    pub enable_audio: bool,
+    pub audio_volume: f32,
 }
 
 pub enum SettingsPanelAction {
@@ -57,11 +61,15 @@ impl Default for SettingsPanelState {
             use_gnome_sort: false,
 
             // color palette defaults
-            use_custom_palette: false,
+            use_custom_palette: true,
             palette_base_hue_degrees: 210.0,   // ~teal
             palette_saturation: 0.85,
             palette_brightness: 0.9,
             palette_gradient_strength: 0.18,
+
+            // audio defaults
+            enable_audio: true,
+            audio_volume: 0.4,
         }
     }
 }
@@ -208,6 +216,22 @@ impl SettingsPanelState {
 
         ui.separator();
 
+        // --------------------------------------------------------------------
+        // Audio settings
+        // --------------------------------------------------------------------
+        ui.collapsing("Audio", |ui| {
+            ui.checkbox(&mut self.enable_audio, "Enable swap/write sounds")
+                .on_hover_text("Play a short tone whenever the array changes between frames.");
+
+            ui.add_enabled(
+                self.enable_audio,
+                egui::Slider::new(&mut self.audio_volume, 0.0..=1.0)
+                    .text("Master Volume"),
+            );
+        });
+
+        ui.separator();
+
         let mut action = SettingsPanelAction::None;
 
         match engine_state {
@@ -253,7 +277,7 @@ impl SettingsPanelState {
                     }
                     
 
-
+                    
 
                     action = SettingsPanelAction::StartRequested(selected_algorithms);
                 }
