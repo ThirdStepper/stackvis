@@ -44,7 +44,7 @@ impl Default for SettingsPanelState {
     fn default() -> Self {
         Self {
             number_of_values: 128,
-            frames_per_second: 30,
+            frames_per_second: 60,
 
             // sorting algo defaults
             use_bubble_sort: true,
@@ -65,11 +65,11 @@ impl Default for SettingsPanelState {
             palette_base_hue_degrees: 210.0,   // ~teal
             palette_saturation: 0.85,
             palette_brightness: 0.9,
-            palette_gradient_strength: 0.18,
+            palette_gradient_strength: 0.28,
 
             // audio defaults
             enable_audio: true,
-            audio_volume: 0.4,
+            audio_volume: 0.3,
         }
     }
 }
@@ -84,7 +84,7 @@ impl SettingsPanelState {
         );
 
         ui.add(egui::Slider::new(
-            &mut self.frames_per_second, 10..=60)
+            &mut self.frames_per_second, 10..=120)
                 .text("Frames per second")
         );
 
