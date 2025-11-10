@@ -6,7 +6,6 @@ pub fn intro_sort_with_recording(initial_values: &[u32], frames: &mut Vec<Vec<u3
         return;
     }
 
-    // Record initial unsorted state
     frames.push(values.clone());
 
     let length = values.len();
@@ -102,12 +101,11 @@ fn heap_sort_range(
     let segment: Vec<u32> = values[start_index..end_index].to_vec();
     let mut local_frames: Vec<Vec<u32>> = Vec::new();
 
-    // Run your existing heap sort on the segment
     heap_sort_with_recording(&segment, &mut local_frames);
 
-    // Map the segment-level frames back into the full array context
+    // map segment frames to full array
     for (frame_index, segment_state) in local_frames.into_iter().enumerate() {
-        // Skip the first frame (initial state) to avoid duplicating frames
+        // skip initial frame to avoid duplication
         if frame_index == 0 {
             continue;
         }

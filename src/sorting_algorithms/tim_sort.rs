@@ -6,7 +6,6 @@ pub fn tim_sort_with_recording(initial_values: &[u32], frames: &mut Vec<Vec<u32>
         return;
     }
 
-    // Record initial unsorted state
     frames.push(values.clone());
 
     let length = values.len();
@@ -23,7 +22,7 @@ pub fn tim_sort_with_recording(initial_values: &[u32], frames: &mut Vec<Vec<u32>
         MINIMUM_RUN_LENGTH
     };
 
-    // 1) Sort small runs with insertion sort
+    // sort small runs with insertion sort
     let mut start_index: usize = 0;
     while start_index < length {
         let end_index = (start_index + run_length).min(length);
@@ -31,7 +30,7 @@ pub fn tim_sort_with_recording(initial_values: &[u32], frames: &mut Vec<Vec<u32>
         start_index = end_index;
     }
 
-    // 2) Merge runs in a bottom-up fashion
+    // merge runs bottom-up
     let mut current_run_size = run_length;
     while current_run_size < length {
         let mut merge_start_index: usize = 0;

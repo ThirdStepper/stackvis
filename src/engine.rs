@@ -63,7 +63,6 @@ impl EngineController {
     }
 
     pub fn start_run(&mut self, config: EngineConfig) {
-        // Stop any existing worker first
         self.stop();
 
         self.stop_flag.store(false, Ordering::SeqCst);
@@ -82,7 +81,7 @@ impl EngineController {
 
             let algorithms_total = selected_algorithms.len();
 
-            // Set state to Preparing before generating frames
+            // set state to preparing
             {
                 let mut locked_state = shared_state_clone.lock().unwrap();
                 locked_state.engine_state = EngineState::Preparing {
@@ -91,10 +90,10 @@ impl EngineController {
                 };
             }
 
-            // Generate frames for each algorithm, updating progress as we go
+            // generate frames, update progress
             let mut algorithm_replays: Vec<SortingAlgorithmReplay> = Vec::new();
             for (index, algorithm_kind) in selected_algorithms.into_iter().enumerate() {
-                // Check if stop was requested during preparation
+                // check stop flag
                 if stop_flag_clone.load(Ordering::SeqCst) {
                     let mut locked_state = shared_state_clone.lock().unwrap();
                     locked_state.algorithm_states.clear();
@@ -102,11 +101,9 @@ impl EngineController {
                     return;
                 }
 
-                // Generate frames for this algorithm
                 let replay = SortingAlgorithmReplay::new(algorithm_kind, &base_values);
                 algorithm_replays.push(replay);
 
-                // Update progress
                 {
                     let mut locked_state = shared_state_clone.lock().unwrap();
                     locked_state.engine_state = EngineState::Preparing {

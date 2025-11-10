@@ -7,8 +7,7 @@ use crate::sorting_algorithms::SortingAlgorithmKind;
 pub struct SettingsPanelState {
     pub number_of_values: usize,
     pub frames_per_second: u32,
-    
-    // which algos to use
+
     pub use_bubble_sort: bool,
     pub use_quick_sort: bool,
     use_insertion_sort: bool,
@@ -21,15 +20,13 @@ pub struct SettingsPanelState {
     use_cocktail_sort: bool,
     use_comb_sort: bool,
     use_gnome_sort: bool,
-    
-    // color palette settings
+
     pub use_custom_palette: bool,
     pub palette_base_hue_degrees: f32,
     pub palette_saturation: f32,
     pub palette_brightness: f32,
     pub palette_gradient_strength: f32,
 
-    // audio settings
     pub enable_audio: bool,
     pub audio_volume: f32,
 }
@@ -46,7 +43,6 @@ impl Default for SettingsPanelState {
             number_of_values: 128,
             frames_per_second: 60,
 
-            // sorting algo defaults
             use_bubble_sort: true,
             use_quick_sort: true,
             use_insertion_sort: false,
@@ -60,14 +56,12 @@ impl Default for SettingsPanelState {
             use_comb_sort: false,
             use_gnome_sort: false,
 
-            // color palette defaults
             use_custom_palette: true,
-            palette_base_hue_degrees: 210.0,   // ~teal
+            palette_base_hue_degrees: 210.0, // ~teal
             palette_saturation: 0.85,
             palette_brightness: 0.9,
             palette_gradient_strength: 0.28,
 
-            // audio defaults
             enable_audio: true,
             audio_volume: 0.3,
         }
@@ -79,14 +73,10 @@ impl SettingsPanelState {
         ui.heading("Settings");
 
         ui.add(
-            egui::Slider::new(&mut self.number_of_values, 32..=2500)
-                .text("Values per algorithm"),
+            egui::Slider::new(&mut self.number_of_values, 32..=2500).text("Values per algorithm")
         );
 
-        ui.add(egui::Slider::new(
-            &mut self.frames_per_second, 10..=120)
-                .text("Frames per second")
-        );
+        ui.add(egui::Slider::new(&mut self.frames_per_second, 10..=120).text("Frames per second"));
 
         ui.separator();
         ui.label("Algorithms to visualize:");
@@ -97,11 +87,10 @@ impl SettingsPanelState {
         ui.collapsing("Basic O(n²) comparison sorts", |ui| {
             ui.horizontal(|ui| {
                 ui.label(
-                    egui::RichText::new(
-                        "Simple, educational sorts – good for seeing the fundamentals.",
-                    )
-                    .small()
-                    .italics(),
+                    egui::RichText
+                        ::new("Simple, educational sorts – good for seeing the fundamentals.")
+                        .small()
+                        .italics()
                 );
 
                 if ui.button("Select all").clicked() {
@@ -134,11 +123,10 @@ impl SettingsPanelState {
         ui.collapsing("Classic O(n log n) sorts", |ui| {
             ui.horizontal(|ui| {
                 ui.label(
-                    egui::RichText::new(
-                        "Divide-and-conquer algorithms used in textbooks and interviews.",
-                    )
-                    .small()
-                    .italics(),
+                    egui::RichText
+                        ::new("Divide-and-conquer algorithms used in textbooks and interviews.")
+                        .small()
+                        .italics()
                 );
 
                 if ui.button("Select all").clicked() {
@@ -165,9 +153,10 @@ impl SettingsPanelState {
         ui.collapsing("Hybrid / practical sorts", |ui| {
             ui.horizontal(|ui| {
                 ui.label(
-                    egui::RichText::new("More realistic, production-style algorithms.")
+                    egui::RichText
+                        ::new("More realistic, production-style algorithms.")
                         .small()
-                        .italics(),
+                        .italics()
                 );
 
                 if ui.button("Select all").clicked() {
@@ -185,31 +174,32 @@ impl SettingsPanelState {
         ui.separator();
 
         // --------------------------------------------------------------------
-        // Color palette settings
+        // color palette settings
         // --------------------------------------------------------------------
         ui.collapsing("Color palette", |ui| {
-            ui.checkbox(&mut self.use_custom_palette, "Use custom bar colors")
-                .on_hover_text("When disabled, bar colors are derived from the current egui theme.");
+            ui.checkbox(&mut self.use_custom_palette, "Use custom bar colors").on_hover_text(
+                "When disabled, bar colors are derived from the current egui theme."
+            );
 
             ui.add_enabled_ui(self.use_custom_palette, |ui| {
                 ui.add(
-                    egui::Slider::new(&mut self.palette_base_hue_degrees, 0.0..=360.0)
-                        .text("Base hue (degrees)"),
+                    egui::Slider
+                        ::new(&mut self.palette_base_hue_degrees, 0.0..=360.0)
+                        .text("Base hue (degrees)")
                 );
 
                 ui.add(
-                    egui::Slider::new(&mut self.palette_saturation, 0.2..=1.0)
-                        .text("Saturation"),
+                    egui::Slider::new(&mut self.palette_saturation, 0.2..=1.0).text("Saturation")
                 );
 
                 ui.add(
-                    egui::Slider::new(&mut self.palette_brightness, 0.3..=1.0)
-                        .text("Brightness"),
+                    egui::Slider::new(&mut self.palette_brightness, 0.3..=1.0).text("Brightness")
                 );
 
                 ui.add(
-                    egui::Slider::new(&mut self.palette_gradient_strength, 0.0..=0.4)
-                        .text("Gradient strength"),
+                    egui::Slider
+                        ::new(&mut self.palette_gradient_strength, 0.0..=0.4)
+                        .text("Gradient strength")
                 );
             });
         });
@@ -217,16 +207,16 @@ impl SettingsPanelState {
         ui.separator();
 
         // --------------------------------------------------------------------
-        // Audio settings
+        // audio settings
         // --------------------------------------------------------------------
         ui.collapsing("Audio", |ui| {
-            ui.checkbox(&mut self.enable_audio, "Enable swap/write sounds")
-                .on_hover_text("Play a short tone whenever the array changes between frames.");
+            ui.checkbox(&mut self.enable_audio, "Enable swap/write sounds").on_hover_text(
+                "Play a short tone whenever the array changes between frames."
+            );
 
             ui.add_enabled(
                 self.enable_audio,
-                egui::Slider::new(&mut self.audio_volume, 0.0..=1.0)
-                    .text("Master Volume"),
+                egui::Slider::new(&mut self.audio_volume, 0.0..=1.0).text("Master Volume")
             );
         });
 
@@ -275,9 +265,6 @@ impl SettingsPanelState {
                     if self.use_gnome_sort {
                         selected_algorithms.push(SortingAlgorithmKind::GnomeSort);
                     }
-                    
-
-                    
 
                     action = SettingsPanelAction::StartRequested(selected_algorithms);
                 }
@@ -285,11 +272,9 @@ impl SettingsPanelState {
             EngineState::Preparing { algorithms_completed, algorithms_total } => {
                 ui.add_enabled(
                     false,
-                    egui::Button::new(format!(
-                        "Preparing... ({}/{})",
-                        algorithms_completed,
-                        algorithms_total
-                    ))
+                    egui::Button::new(
+                        format!("Preparing... ({}/{})", algorithms_completed, algorithms_total)
+                    )
                 );
                 if ui.button("Stop").clicked() {
                     action = SettingsPanelAction::StopRequested;
@@ -303,6 +288,5 @@ impl SettingsPanelState {
         }
 
         action
-
     }
 }

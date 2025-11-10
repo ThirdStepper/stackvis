@@ -26,7 +26,7 @@ use crate::sorting_algorithms::gnome_sort::gnome_sort_with_recording;
 use crate::sorting_algorithms::intro_sort::intro_sort_with_recording;
 use crate::sorting_algorithms::tim_sort::tim_sort_with_recording;
 
-use crate::stats::{SortStats, StatsSnapshot};
+use crate::stats::{ SortStats, StatsSnapshot };
 
 #[derive(Clone, Copy, Debug)]
 pub enum SortingAlgorithmKind {
@@ -47,21 +47,20 @@ pub enum SortingAlgorithmKind {
 impl SortingAlgorithmKind {
     pub fn display_name(&self) -> &'static str {
         match self {
-            SortingAlgorithmKind::BubbleSort    => "Bubble Sort",
-            SortingAlgorithmKind::QuickSort     => "Quick Sort",
+            SortingAlgorithmKind::BubbleSort => "Bubble Sort",
+            SortingAlgorithmKind::QuickSort => "Quick Sort",
             SortingAlgorithmKind::InsertionSort => "Insertion Sort",
             SortingAlgorithmKind::SelectionSort => "Selection Sort",
-            SortingAlgorithmKind::MergeSort     => "Merge Sort",
-            SortingAlgorithmKind::HeapSort      => "Heap Sort",
-            SortingAlgorithmKind::ShellSort     => "Shell Sort",
-            SortingAlgorithmKind::IntroSort     => "Intro Sort",
-            SortingAlgorithmKind::TimSort       => "Tim Sort",
-            SortingAlgorithmKind::CocktailSort  => "Cocktail Shaker Sort",
-            SortingAlgorithmKind::CombSort      => "Comb Sort",
-            SortingAlgorithmKind::GnomeSort     => "Gnome Sort",
+            SortingAlgorithmKind::MergeSort => "Merge Sort",
+            SortingAlgorithmKind::HeapSort => "Heap Sort",
+            SortingAlgorithmKind::ShellSort => "Shell Sort",
+            SortingAlgorithmKind::IntroSort => "Intro Sort",
+            SortingAlgorithmKind::TimSort => "Tim Sort",
+            SortingAlgorithmKind::CocktailSort => "Cocktail Shaker Sort",
+            SortingAlgorithmKind::CombSort => "Comb Sort",
+            SortingAlgorithmKind::GnomeSort => "Gnome Sort",
         }
     }
-
 }
 
 pub struct SortingAlgorithmReplay {
@@ -125,9 +124,7 @@ impl SortingAlgorithmReplay {
         let stats = SortStats::from_measurements(total_steps, duration);
 
         SortingAlgorithmReplay {
-            algorithm_name: algorithm_kind.
-                display_name()
-                .to_owned(),
+            algorithm_name: algorithm_kind.display_name().to_owned(),
             frames,
             stats,
         }
@@ -139,7 +136,7 @@ impl SortingAlgorithmReplay {
 
     pub fn frame_at(&self, frame_index: usize) -> (Vec<u32>, bool) {
         let last_index = self.frames.len().saturating_sub(1);
-        
+
         if self.frames.is_empty() {
             return (Vec::new(), true);
         }
@@ -155,5 +152,4 @@ impl SortingAlgorithmReplay {
     pub fn stats_snapshot(&self) -> StatsSnapshot {
         self.stats.to_snapshot()
     }
-
 }

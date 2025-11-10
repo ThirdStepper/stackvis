@@ -1,19 +1,25 @@
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{ Arc, Mutex };
 use std::time::Duration;
 use rand::random;
 
-use eframe::egui::{self, Color32};
+use eframe::egui::{ self, Color32 };
 use eframe::egui::epaint::Hsva;
-use rodio::{OutputStream, OutputStreamBuilder, Sink, Source, source::SineWave, source::Spatial};
+use rodio::{ OutputStream, OutputStreamBuilder, Sink, Source, source::SineWave, source::Spatial };
 
-use crate::engine::{AlgorithmStateSnapshot, EngineConfig, EngineController, EngineSharedState, EngineState};
-use crate::ui::settings_panel::{SettingsPanelAction, SettingsPanelState};
+use crate::engine::{
+    AlgorithmStateSnapshot,
+    EngineConfig,
+    EngineController,
+    EngineSharedState,
+    EngineState,
+};
+use crate::ui::settings_panel::{ SettingsPanelAction, SettingsPanelState };
 
-// Maximum number of columns in the algorithm grid
+// max grid columns
 const MAX_GRID_COLUMNS: usize = 4;
 
-// C Major scale
+// c major scale
 const C_MAJOR_DEGREES: [i32; 7] = [0, 2, 4, 5, 7, 9, 11];
 
 // spatial audio constants
@@ -27,7 +33,7 @@ pub struct SortVisApp {
     engine_controller: EngineController,
     settings_state: SettingsPanelState,
 
-    // Audio - OutputStream must be kept alive for audio to work
+    // must keep _audio_stream alive for audio to work
     _audio_stream: Option<OutputStream>,
     audio_sink: Option<Sink>,
     previous_values_for_audio: HashMap<String, Vec<u32>>,
@@ -36,11 +42,11 @@ pub struct SortVisApp {
 impl SortVisApp {
     pub fn new(
         _creation_context: &eframe::CreationContext<'_>,
-        shared_state: Arc<Mutex<EngineSharedState>>,
+        shared_state: Arc<Mutex<EngineSharedState>>
     ) -> Self {
         let engine_controller = EngineController::new(Arc::clone(&shared_state));
 
-        // Initialize audio (gracefully handle failure)
+        // initialize audio, handle failure gracefully
         let (_audio_stream, audio_sink) = match OutputStreamBuilder::open_default_stream() {
             Ok(stream) => {
                 let sink = Sink::connect_new(&stream.mixer());
@@ -65,7 +71,7 @@ impl SortVisApp {
             SettingsPanelAction::None => {}
             SettingsPanelAction::StopRequested => {
                 self.engine_controller.stop();
-                // Also stop any queued sounds and reset audio tracking
+                // stop queued sounds and reset audio tracking
                 self.clear_audio_state();
             }
             SettingsPanelAction::StartRequested(selected_algorithms) => {
@@ -76,7 +82,7 @@ impl SortVisApp {
                 // randomize base hue (0..360)
                 self.settings_state.palette_base_hue_degrees = random::<f32>() * 360.0;
 
-                // Reset audio & recreate a fresh sink for the new run
+                // reset audio and create fresh sink
                 self.clear_audio_state();
                 self.ensure_audio_sink();
 
@@ -91,24 +97,24 @@ impl SortVisApp {
         }
     }
 
-    // Audio state management
+    // audio state management
     fn clear_audio_state(&mut self) {
-        // Stop and drop the current sink (this immediately stops queued sounds)
+        // dropping sink stops queued sounds immediately
         if let Some(sink) = self.audio_sink.take() {
             sink.stop();
         }
 
-        // Forget last-frame values so we don't detect bogus "changes" later
+        // clear to avoid detecting bogus changes
         self.previous_values_for_audio.clear();
     }
 
     fn ensure_audio_sink(&mut self) {
-        // If we already have a sink (and a stream), nothing to do
+        // sink exists, nothing to do
         if self.audio_sink.is_some() {
             return;
         }
 
-        // Lazily (re)create a sink if the stream exists
+        // lazily recreate sink if stream exists
         if let Some(ref stream) = self._audio_stream {
             let sink = Sink::connect_new(&stream.mixer());
             sink.set_volume(0.2);
@@ -116,18 +122,18 @@ impl SortVisApp {
         }
     }
 
-    // Audio detection helpers
+    // audio detection helpers
     fn detect_first_changed_index(&self, previous: &[u32], current: &[u32]) -> Option<usize> {
         let min_len = previous.len().min(current.len());
 
-        // Check for changes in common range
+        // check common range for changes
         for i in 0..min_len {
             if previous[i] != current[i] {
                 return Some(i);
             }
         }
 
-        // If lengths differ, that's a change at the first differing index
+        // length difference is a change at min_len
         if previous.len() != current.len() {
             return Some(min_len);
         }
@@ -140,7 +146,6 @@ impl SortVisApp {
             return;
         };
 
-        // prevent tone stacking
         if !sink.empty() {
             return;
         }
@@ -156,48 +161,41 @@ impl SortVisApp {
             return;
         }
 
-        // horizontal position (0.0 on the left, 1.0 on the right)
+        // horizontal: 0.0 left, 1.0 right
         let normalized_index = if len > 1 {
-            changed_index as f32 / (len - 1) as f32
+            (changed_index as f32) / ((len - 1) as f32)
         } else {
             0.5
         };
 
-        // bar height (0.0..1.0) for loudness shaping
+        // bar height for loudness
         let normalized_value = (value as f32) / maximum_value;
 
         // c major scale mapping
         let frequency = c_major_scale_frequency(normalized_index);
 
-        // map horizontal bar position to 3d emitter position for panning
+        // map bar position to 3d emitter for panning
         let emitter_pos = emitter_position_from_normalized_index(normalized_index);
 
-        // envelope / loudness
+        // envelope loudness
         let amplitude = 0.05 + 0.15 * normalized_value; // 0.05–0.20
         let duration = Duration::from_millis(40);
         let attack = Duration::from_millis(5);
         let release = Duration::from_millis(40);
 
-        // build mono first
         let base_source = SineWave::new(frequency)
             .take_duration(duration)
             .fade_in(attack)
             .fade_out(release)
             .amplify(amplitude);
 
-        // wrap in a stereo source
-        let spatial_source = Spatial::new(
-            base_source,
-            emitter_pos,
-            LEFT_EAR_POS,
-            RIGHT_EAR_POS
-        );
+        let spatial_source = Spatial::new(base_source, emitter_pos, LEFT_EAR_POS, RIGHT_EAR_POS);
 
         sink.append(spatial_source);
     }
 
     fn handle_audio_for_frame(&mut self, engine_state_snapshot: &EngineSharedState) {
-        // if the user disabled audio, flush any queued sounds and bail out.
+        // if audio disabled, clear and return
         if !self.settings_state.enable_audio {
             self.clear_audio_state();
             return;
@@ -206,21 +204,23 @@ impl SortVisApp {
         // check if sink exists
         self.ensure_audio_sink();
         if self.audio_sink.is_none() {
-            // Audio backend failed to init; nothing we can do.
+            // audio backend init failed
             return;
         }
 
         let mut tone_played_this_frame = false;
 
-        // process each algorithm
         for algorithm_state in &engine_state_snapshot.algorithm_states {
             let algorithm_name = &algorithm_state.algorithm_name;
             let current_values = &algorithm_state.current_values;
 
             if let Some(previous_values) = self.previous_values_for_audio.get(algorithm_name) {
                 if !tone_played_this_frame {
-                    if let Some(changed_index) =
-                        self.detect_first_changed_index(previous_values, current_values)
+                    if
+                        let Some(changed_index) = self.detect_first_changed_index(
+                            previous_values,
+                            current_values
+                        )
                     {
                         self.play_audio_for_change(current_values, changed_index);
                         tone_played_this_frame = true;
@@ -228,16 +228,16 @@ impl SortVisApp {
                 }
             }
 
-            self.previous_values_for_audio.insert(
-                algorithm_name.clone(),
-                current_values.clone(),
-            );
+            self.previous_values_for_audio.insert(algorithm_name.clone(), current_values.clone());
         }
     }
 
     fn draw_algorithm_grid(&self, ui: &mut egui::Ui, engine_state_snapshot: &EngineSharedState) {
-        // Check if we're preparing algorithms
-        if let EngineState::Preparing { algorithms_completed, algorithms_total } = engine_state_snapshot.engine_state {
+        // check if preparing
+        if
+            let EngineState::Preparing { algorithms_completed, algorithms_total } =
+                engine_state_snapshot.engine_state
+        {
             ui.centered_and_justified(|center_ui| {
                 center_ui.vertical_centered(|vertical_ui| {
                     vertical_ui.add_space(20.0);
@@ -245,16 +245,19 @@ impl SortVisApp {
                     vertical_ui.heading("Generating sorting frames...");
                     vertical_ui.add_space(10.0);
 
-                    vertical_ui.label(format!(
-                        "Algorithm {} of {} complete",
-                        algorithms_completed,
-                        algorithms_total
-                    ));
+                    vertical_ui.label(
+                        format!(
+                            "Algorithm {} of {} complete",
+                            algorithms_completed,
+                            algorithms_total
+                        )
+                    );
 
                     vertical_ui.add_space(10.0);
 
-                    let progress = algorithms_completed as f32 / algorithms_total as f32;
-                    let progress_bar = egui::ProgressBar::new(progress)
+                    let progress = (algorithms_completed as f32) / (algorithms_total as f32);
+                    let progress_bar = egui::ProgressBar
+                        ::new(progress)
                         .show_percentage()
                         .desired_width(300.0);
                     vertical_ui.add(progress_bar);
@@ -273,124 +276,101 @@ impl SortVisApp {
 
         let available_size = ui.available_size();
 
-        // Define minimum cell dimensions
         let minimum_cell_width = 220.0;
         let minimum_cell_height = 160.0;
 
-        // Calculate how many columns fit horizontally
-        let columns_from_width = (available_size.x / minimum_cell_width)
-            .floor()
-            .max(1.0) as usize;
+        let columns_from_width = (available_size.x / minimum_cell_width).floor().max(1.0) as usize;
 
-        // Calculate how many rows fit vertically
-        let rows_from_height = (available_size.y / minimum_cell_height)
-            .floor()
-            .max(1.0) as usize;
+        let rows_from_height = (available_size.y / minimum_cell_height).floor().max(1.0) as usize;
 
-        // Apply maximum column cap
         let columns_capped = columns_from_width.min(MAX_GRID_COLUMNS);
 
-        // Determine column count considering both dimensions and row preference
         let column_count = if rows_from_height >= 3 && algorithm_count >= 3 {
-            // Vertical space allows 3+ rows, enforce minimum 3 rows
-            // max_columns = ceil(algorithm_count / 3)
+            // enforce min 3 rows if space allows
             let max_columns_for_three_rows = (algorithm_count + 2) / 3;
-            columns_capped
-                .min(max_columns_for_three_rows)
-                .min(algorithm_count)
+            columns_capped.min(max_columns_for_three_rows).min(algorithm_count)
         } else if rows_from_height >= 2 && algorithm_count > 1 {
-            // Vertical space allows 2+ rows, enforce minimum 2 rows
+            // enforce min 2 rows if space allows
             let max_columns_for_two_rows = (algorithm_count + 1) / 2;
-            columns_capped
-                .min(max_columns_for_two_rows)
-                .min(algorithm_count)
+            columns_capped.min(max_columns_for_two_rows).min(algorithm_count)
         } else {
-            // Not enough vertical space, or only 1 algorithm
+            // insufficient vertical space or single algo
             columns_capped.min(algorithm_count)
         };
 
         let row_count = ((algorithm_count + column_count - 1) / column_count).max(1);
 
-        // Compute cell dimensions that grow/shrink with window
-        let cell_width = (available_size.x / column_count as f32).max(minimum_cell_width);
-        let cell_height = (available_size.y / row_count as f32).max(minimum_cell_height);
+        let cell_width = (available_size.x / (column_count as f32)).max(minimum_cell_width);
+        let cell_height = (available_size.y / (row_count as f32)).max(minimum_cell_height);
         let cell_size = egui::vec2(cell_width, cell_height);
 
-        // Layout cells using nested loops
         let mut algorithm_index = 0;
         for _row_index in 0..row_count {
             ui.horizontal(|row_ui| {
                 for _col_index in 0..column_count {
                     if algorithm_index < algorithm_count {
-                        let algorithm_state = &engine_state_snapshot.algorithm_states[algorithm_index];
+                        let algorithm_state =
+                            &engine_state_snapshot.algorithm_states[algorithm_index];
                         row_ui.allocate_ui(cell_size, |cell_ui| {
                             cell_ui.set_min_size(cell_size);
                             self.draw_algorithm_panel(cell_ui, algorithm_state);
                         });
                         algorithm_index += 1;
                     } else {
-                        // Fill empty cells to maintain grid alignment
                         row_ui.add_space(cell_size.x);
                     }
                 }
             });
 
-            // Add spacing between rows
             ui.add_space(8.0);
         }
     }
 
-    fn draw_algorithm_panel(
-        &self,
-        ui: &mut egui::Ui,
-        algorithm_state: &AlgorithmStateSnapshot,
-    ) {
+    fn draw_algorithm_panel(&self, ui: &mut egui::Ui, algorithm_state: &AlgorithmStateSnapshot) {
         ui.vertical(|panel_ui| {
             panel_ui.group(|group_ui| {
-                // Enhanced title formatting
                 if algorithm_state.is_finished {
                     group_ui.label(
-                        egui::RichText::new(format!("{} (finished)", algorithm_state.algorithm_name))
+                        egui::RichText
+                            ::new(format!("{} (finished)", algorithm_state.algorithm_name))
                             .strong()
                             .italics()
                     );
                 } else {
-                    group_ui.label(
-                        egui::RichText::new(&algorithm_state.algorithm_name)
-                            .strong()
-                    );
+                    group_ui.label(egui::RichText::new(&algorithm_state.algorithm_name).strong());
                 }
 
                 let stats_text = format!(
                     "Steps: {} | Time: {:.2} ms ({:.4} s)",
                     algorithm_state.stats.total_steps,
                     algorithm_state.stats.duration_milliseconds,
-                    algorithm_state.stats.duration_seconds,
+                    algorithm_state.stats.duration_seconds
                 );
                 group_ui.label(stats_text);
 
-                // Use dynamic sizing based on available space
                 let available_size = group_ui.available_size();
                 let reserved_height_for_labels = 40.0;
                 let chart_height = (available_size.y - reserved_height_for_labels).max(40.0);
                 let chart_size = egui::vec2(available_size.x, chart_height);
 
-                let (response, painter) =
-                    group_ui.allocate_painter(chart_size, egui::Sense::hover());
+                let (response, painter) = group_ui.allocate_painter(
+                    chart_size,
+                    egui::Sense::hover()
+                );
 
                 let bounding_rect = response.rect;
 
                 let chart_margin_top = 6.0;
                 let chart_rect = egui::Rect::from_min_max(
                     egui::pos2(bounding_rect.left(), bounding_rect.top() + chart_margin_top),
-                    egui::pos2(bounding_rect.right(), bounding_rect.bottom()),
+                    egui::pos2(bounding_rect.right(), bounding_rect.bottom())
                 );
 
                 self.draw_bar_chart(
                     &painter,
                     chart_rect,
                     &algorithm_state.current_values,
-                    algorithm_state.is_finished,
+                    algorithm_state.is_finished
                 );
             });
         });
@@ -400,18 +380,18 @@ impl SortVisApp {
         &self,
         visuals: &egui::Visuals,
         normalized_value: f32,
-        is_finished: bool,
+        is_finished: bool
     ) -> Color32 {
         let clamped_value = normalized_value.clamp(0.0, 1.0);
 
-        // Snapshot palette settings (short borrows, no borrow conflicts)
+        // snapshot palette settings to avoid borrow conflicts
         let use_custom_palette = self.settings_state.use_custom_palette;
         let palette_base_hue_degrees = self.settings_state.palette_base_hue_degrees;
         let palette_saturation = self.settings_state.palette_saturation;
         let palette_brightness = self.settings_state.palette_brightness;
         let palette_gradient_strength = self.settings_state.palette_gradient_strength;
 
-        // Base hue: either theme-based, or user-defined
+        // base hue from theme or user setting
         let base_hue = if use_custom_palette {
             (palette_base_hue_degrees / 360.0).rem_euclid(1.0)
         } else if visuals.dark_mode {
@@ -420,18 +400,13 @@ impl SortVisApp {
             0.13 // orange-ish
         };
 
-        // Gradient strength: how much hue varies with value
-        let gradient_strength = if use_custom_palette {
-            palette_gradient_strength
-        } else {
-            0.18
-        };
+        // gradient strength controls hue variation
+        let gradient_strength = if use_custom_palette { palette_gradient_strength } else { 0.18 };
 
         let hue_variation = gradient_strength * (clamped_value - 0.5);
         let hue = (base_hue + hue_variation).rem_euclid(1.0);
 
-        // Saturation: either fixed theme-based, or user slider with a slight
-        // desaturation for finished algorithms
+        // saturation from theme or user, desaturated if finished
         let saturation = if use_custom_palette {
             let base = palette_saturation.clamp(0.0, 1.0);
             if is_finished {
@@ -445,7 +420,7 @@ impl SortVisApp {
             0.85
         };
 
-        // Brightness: either theme-based, or user slider
+        // brightness from theme or user setting
         let value_brightness = if use_custom_palette {
             palette_brightness.clamp(0.0, 1.0)
         } else if visuals.dark_mode {
@@ -457,14 +432,10 @@ impl SortVisApp {
         Hsva::new(hue, saturation, value_brightness, 1.0).into()
     }
 
-    fn chart_background_color(
-        &self,
-        visuals: &egui::Visuals,
-        is_finished: bool,
-    ) -> Color32 {
+    fn chart_background_color(&self, visuals: &egui::Visuals, is_finished: bool) -> Color32 {
         let mut background = visuals.extreme_bg_color;
 
-        // Brighten for finished algorithms, darken for active ones
+        // brighten if finished, darken if active
         if is_finished {
             background = background.linear_multiply(1.05);
         } else {
@@ -479,7 +450,7 @@ impl SortVisApp {
         painter: &egui::Painter,
         chart_rect: egui::Rect,
         values: &[u32],
-        is_finished: bool,
+        is_finished: bool
     ) {
         if values.is_empty() {
             return;
@@ -492,20 +463,18 @@ impl SortVisApp {
 
         let visuals = &painter.ctx().style().visuals;
 
-        // Draw background with subtle color
         let chart_background_color = self.chart_background_color(visuals, is_finished);
         painter.rect_filled(chart_rect, 4.0, chart_background_color);
 
-        // Compute bar layout
         let bar_count = values.len();
-        let bar_width = chart_rect.width() / bar_count as f32;
+        let bar_width = chart_rect.width() / (bar_count as f32);
         let bar_spacing_factor = 0.9;
 
         for (value_index, value) in values.iter().enumerate() {
             let normalized_height = (*value as f32) / maximum_value;
             let bar_height = chart_rect.height() * normalized_height.max(0.0);
 
-            let left_position = chart_rect.left() + bar_width * value_index as f32;
+            let left_position = chart_rect.left() + bar_width * (value_index as f32);
             let right_position = left_position + bar_width * bar_spacing_factor;
 
             let bottom_position = chart_rect.bottom();
@@ -513,13 +482,11 @@ impl SortVisApp {
 
             let bar_rect = egui::Rect::from_min_max(
                 egui::pos2(left_position, top_position),
-                egui::pos2(right_position, bottom_position),
+                egui::pos2(right_position, bottom_position)
             );
 
-            // Get color based on normalized height and finished state
             let bar_color = self.bar_fill_color(visuals, normalized_height, is_finished);
 
-            // Draw bar with rounded corners
             painter.rect_filled(bar_rect, 2.0, bar_color);
         }
     }
@@ -540,11 +507,13 @@ impl eframe::App for SortVisApp {
                         horizontal_ui.label("Status: Idle");
                     }
                     EngineState::Preparing { algorithms_completed, algorithms_total } => {
-                        horizontal_ui.label(format!(
-                            "Status: Preparing... ({}/{})",
-                            algorithms_completed,
-                            algorithms_total
-                        ));
+                        horizontal_ui.label(
+                            format!(
+                                "Status: Preparing... ({}/{})",
+                                algorithms_completed,
+                                algorithms_total
+                            )
+                        );
                     }
                     EngineState::Running => {
                         horizontal_ui.label("Status: Running");
@@ -553,13 +522,12 @@ impl eframe::App for SortVisApp {
             });
         });
 
-        egui::SidePanel::left("settings_panel")
+        egui::SidePanel
+            ::left("settings_panel")
             .resizable(true)
             .default_width(220.0)
             .show(context, |ui| {
-                let action =
-                    self.settings_state
-                        .show(ui, &engine_state_snapshot.engine_state);
+                let action = self.settings_state.show(ui, &engine_state_snapshot.engine_state);
                 self.handle_settings_action(action);
             });
 
@@ -567,49 +535,46 @@ impl eframe::App for SortVisApp {
             self.draw_algorithm_grid(ui, &engine_state_snapshot);
         });
 
-        // Handle audio for current frame
         if let Some(sink) = &self.audio_sink {
             sink.set_volume(self.settings_state.audio_volume);
         }
         self.handle_audio_for_frame(&engine_state_snapshot);
 
-        // Continuous animation
         context.request_repaint();
     }
 }
 
 fn emitter_position_from_normalized_index(normalized_index: f32) -> [f32; 3] {
-    let x = (normalized_index.clamp(0.0, 1.0) * 2.0) - 1.0; // 0..1 -> -1..1
+    // 0..1 -> -1..1
+    let x = normalized_index.clamp(0.0, 1.0) * 2.0 - 1.0;
     [x, 0.0, EMITTER_Z]
 }
 
 fn freq_from_semitones(base_freq: f32, semitone_offset: i32) -> f32 {
-    base_freq * 2.0f32.powf(semitone_offset as f32 / 12.0)
+    base_freq * (2.0f32).powf((semitone_offset as f32) / 12.0)
 }
 
 fn c_major_scale_frequency(normalized_index: f32) -> f32 {
-    // clamp at start
     let x = normalized_index.clamp(0.0, 1.0);
 
-    // how many total notes to span
-    // 3 octaves of C-major = 3 * 7 = 21 steps
+    // 3 octaves of c major = 21 steps
     let total_steps = 21;
 
-    // map x -> 0..(total_steps - 1)
-    let step_index = (x * (total_steps - 1) as f32).round() as i32;
+    // map to 0..20
+    let step_index = (x * ((total_steps - 1) as f32)).round() as i32;
 
-    // split into octave index and degree index
+    // split into octave and degree
     let degrees_per_octave = C_MAJOR_DEGREES.len() as i32;
     let octave = step_index / degrees_per_octave;
     let degree_index = (step_index % degrees_per_octave).max(0);
 
-    // look up the semitone offset within the scale
+    // lookup semitone offset
     let degree_semitones = C_MAJOR_DEGREES[degree_index as usize];
 
-    // total semitones = octave * 12 + degree offset
+    // total = octave * 12 + degree
     let total_semitones = octave * 12 + degree_semitones;
 
-    // base note: C3 ≈ 130.81 Hz
+    // base: a4 = 440 hz
     let base_freq = 440.0;
 
     freq_from_semitones(base_freq, total_semitones)

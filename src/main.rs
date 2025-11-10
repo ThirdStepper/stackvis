@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{ Arc, Mutex };
 
 mod engine;
 mod sorting_algorithms;
@@ -18,7 +18,6 @@ fn main() -> eframe::Result<()> {
             let shared_state = Arc::new(Mutex::new(EngineSharedState::default()));
             let app = SortVisApp::new(creation_context, shared_state);
             Ok(Box::new(app))
-        }),
+        })
     )
 }
-

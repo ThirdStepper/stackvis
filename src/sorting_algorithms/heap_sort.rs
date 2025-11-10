@@ -4,12 +4,11 @@ pub fn heap_sort_with_recording(initial_values: &[u32], frames: &mut Vec<Vec<u32
         return;
     }
 
-    // Record initial unsorted state
     frames.push(values.clone());
 
     let length = values.len();
 
-    // Build max heap
+    // build max heap
     if length > 1 {
         let mut heap_index = length / 2;
         while heap_index > 0 {
@@ -18,7 +17,7 @@ pub fn heap_sort_with_recording(initial_values: &[u32], frames: &mut Vec<Vec<u32
         }
     }
 
-    // Extract max repeatedly
+    // extract max repeatedly
     let mut unsorted_size = length;
     while unsorted_size > 1 {
         unsorted_size -= 1;

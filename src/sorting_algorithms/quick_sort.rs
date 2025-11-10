@@ -5,7 +5,6 @@ pub fn quick_sort_with_recording(initial_values: &[u32], frames: &mut Vec<Vec<u3
         return;
     }
 
-    // record initial unsorted state
     frames.push(values.clone());
 
     let length = values.len();
@@ -14,7 +13,6 @@ pub fn quick_sort_with_recording(initial_values: &[u32], frames: &mut Vec<Vec<u3
         quick_sort_recursive(&mut values, 0, length - 1, frames);
     }
 
-    // ensure final sorted state is recorded
     if frames.last().map(|last_frame| last_frame.as_slice()) != Some(values.as_slice()) {
         frames.push(values);
     }

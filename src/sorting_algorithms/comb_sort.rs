@@ -4,7 +4,6 @@ pub fn comb_sort_with_recording(initial_values: &[u32], frames: &mut Vec<Vec<u32
         return;
     }
 
-    // Record initial unsorted state
     frames.push(values.clone());
 
     let length = values.len();

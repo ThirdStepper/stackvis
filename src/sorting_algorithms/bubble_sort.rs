@@ -5,7 +5,6 @@ pub fn bubble_sort_with_recording(initial_values: &[u32], frames: &mut Vec<Vec<u
         return;
     }
 
-    // record initial unsorted state
     frames.push(values.clone());
 
     let length = values.len();
@@ -25,7 +24,6 @@ pub fn bubble_sort_with_recording(initial_values: &[u32], frames: &mut Vec<Vec<u
         }
     }
 
-    // ensure final sort state is present
     if frames.last().map(|last_frame| last_frame.as_slice()) != Some(values.as_slice()) {
         frames.push(values);
     }

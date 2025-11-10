@@ -4,7 +4,6 @@ pub fn insertion_sort_with_recording(initial_values: &[u32], frames: &mut Vec<Ve
         return;
     }
 
-    // record initial unsorted state
     frames.push(values.clone());
 
     let length = values.len();
