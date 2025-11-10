@@ -1,14 +1,11 @@
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc, Mutex,
-};
+use std::sync::{ atomic::{ AtomicBool, Ordering }, Arc, Mutex };
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{ Duration, Instant };
 
 use rand::seq::SliceRandom;
 use rand::rng;
 
-use crate::sorting_algorithms::{SortingAlgorithmKind, SortingAlgorithmReplay};
+use crate::sorting_algorithms::{ SortingAlgorithmKind, SortingAlgorithmReplay };
 use crate::stats::StatsSnapshot;
 
 #[derive(Clone)]

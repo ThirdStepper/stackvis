@@ -2,6 +2,10 @@
 
 ## Overview
 
+
+https://github.com/user-attachments/assets/f153dc37-451c-4847-99fe-aaf37324abc2
+
+
 StackVis is an educational tool for visualizing and comparing sorting algorithms in real-time. Implemented in Rust, it provides concurrent visual representations of multiple algorithms operating on identical datasets, enabling direct comparative analysis of algorithmic behavior and performance.
 
 ## Architecture
